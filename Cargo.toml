@@ -1,0 +1,19 @@
+[package]
+name = "star_rng"
+version = "0.1.0"
+edition = "2021"
+authors = ["Aaron Kutch <aaronkutch@att.net>"]
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/AaronKutch/star_rng"
+documentation = "https://docs.rs/star_rng"
+description = "opinionated PRNG for easier fuzz testing"
+keywords = ["rng", "prng", "random"]
+categories = ["algorithms", "no-std"]
+
+[dependencies]
+awint = { version = "0.17", default-features = false }
+rand_xoshiro = { version = "0.6", default-features = false }
+
+[dev-dependencies]
+awint = { version = "0.17", default-features = false, features = ["alloc"] }
