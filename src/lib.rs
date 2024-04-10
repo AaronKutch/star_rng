@@ -1,5 +1,7 @@
 #![no_std]
 
+use core::cmp::{max, min};
+
 use awint::awi::*;
 use rand_xoshiro::{
     rand_core::{RngCore, SeedableRng},
@@ -8,9 +10,10 @@ use rand_xoshiro::{
 
 /// A PRNG (psuedorandom number generator).
 ///
-/// This is a wrapper around [rand_xoshiro::Xoshiro128StarStar] that buffers rng
-/// calls down to the bit level. This is _not_ suitable for cryptographic
-/// purposes, but rather is meant for deterministic fuzzing tests and more.
+/// This is an opinionated wrapper around [rand_xoshiro::Xoshiro128StarStar]
+/// that buffers rng calls down to the bit level for even higher performance.
+/// This is _not_ suitable for cryptographic purposes, but rather is meant for
+/// deterministic fuzzing tests and more.
 #[derive(Debug)]
 pub struct StarRng {
     rng: Xoshiro128StarStar,
@@ -84,6 +87,46 @@ macro_rules! out_of {
     };
 }
 
+// almost the same thing as `index`, but I use a different name because `usize`
+// should usually only be used in a fuzzing context when randomly indexing a
+// memory limited set of things
+
+macro_rules! uniform {
+    ($($fn:ident, $x:ident, $to_x:ident, $bw:expr);*;) => {
+        $(
+            /// Returns an integer uniformly from 0..=max.
+            #[must_use]
+            pub fn $fn(&mut self, max: $x) -> $x {
+                if max == 0 {
+                    0
+                } else {
+                    let w = if max >= (1 << ($bw - 1)) {
+                        $bw
+                    } else {
+                        max.wrapping_add(1).next_power_of_two().trailing_zeros() as usize
+                    };
+                    let mut tmp: inlawi_ty!($bw) = InlAwi::zero();
+                    // TODO are there any ill states that `Xoshiro128StarStar` can get into?
+                    // In case of such a state, we have a finite
+                    // number of loops to guarantee termination
+                    for _ in 0..64 {
+                        self.next_bits_width(&mut tmp, w).unwrap();
+                        let test_val = tmp.$to_x();
+                        if test_val <= max {
+                            return test_val;
+                        }
+                        // else retry and avoid bias, the simplest and cheapest method for
+                        // small `max` values. Because of our choice of `w`, the chance of
+                        // success is at least 50%, meaning that the worst case is that we
+                        // have to sample twice on average.
+                    }
+                    return 0;
+                }
+            }
+        )*
+    }
+}
+
 impl StarRng {
     /// The bitwidth of the internal buffer as a `u8`
     const BW_U8: u8 = 64;
@@ -106,6 +149,14 @@ impl StarRng {
         out_of_32, 32, 5;
         out_of_64, 64, 6;
         out_of_128, 128, 7;
+    );
+
+    uniform!(
+        uniform_u8, u8, to_u8, 8;
+        uniform_u16, u16, to_u16, 16;
+        uniform_u32, u32, to_u32, 32;
+        uniform_u64, u64, to_u64, 64;
+        uniform_u128, u128, to_u128, 128;
     );
 
     /// Creates a new `StarRng` with the given seed
@@ -195,21 +246,31 @@ impl StarRng {
     /// `None` if `len == 0`.
     #[must_use]
     pub fn index(&mut self, len: usize) -> Option<usize> {
-        // TODO there are more sophisticated methods to reduce bias
         if len == 0 {
             None
-        } else if len <= (u8::MAX as usize) {
-            let inx = self.next_u16();
-            Some((inx as usize) % len)
-        } else if len <= (u16::MAX as usize) {
-            let inx = self.next_u32();
-            Some((inx as usize) % len)
-        } else if len <= (u32::MAX as usize) {
-            let inx = self.next_u64();
-            Some((inx as usize) % len)
         } else {
-            let inx = self.next_u128();
-            Some((inx as usize) % len)
+            let w = if len >= (1 << (usize::BITS - 1)) {
+                usize::BITS as usize
+            } else {
+                len.next_power_of_two().trailing_zeros() as usize
+            };
+            let mut tmp = InlAwi::from_usize(0);
+            // TODO are there any ill states that `Xoshiro128StarStar` can get into?
+            // In case of such a state, we have a finite
+            // number of loops to guarantee termination
+            for _ in 0..64 {
+                self.next_bits_width(&mut tmp, w).unwrap();
+                let test_val = tmp.to_usize();
+                if test_val < len {
+                    return Some(test_val);
+                }
+                // else retry and avoid bias, the simplest and cheapest method
+                // for small `max` values. Because of our choice
+                // of `w`, the chance of success is at least
+                // 50%, meaning that the worst case is that we
+                // have to sample twice on average.
+            }
+            Some(0)
         }
     }
 
@@ -227,9 +288,8 @@ impl StarRng {
         slice.get_mut(inx)
     }
 
-    /// This performs one step of a fuzzer where a random width of ones is
-    /// rotated randomly and randomly ORed, ANDed, or XORed to `x`. `pad` needs
-    /// to have the same bitwidth as `x`, otherwise `None` is returned.
+    /// This performs one step of a fuzzer where a random field of ones is
+    /// ORed, ANDed, or XORed to `x`.
     ///
     /// In many cases there are issues that involve long lines of all set or
     /// unset bits, and the `next_bits` function is unsuitable for this as
@@ -241,42 +301,35 @@ impl StarRng {
     /// use awint::awi::*;
     /// use star_rng::StarRng;
     ///
-    /// let mut rng = StarRng::new(0);
+    /// let mut rng = StarRng::new(7);
     /// let mut x = awi!(0u128);
-    /// let mut pad = x.clone();
     /// // this should be done in a loop with thousands of iterations,
     /// // here I have unrolled a few for example
-    /// rng.linear_fuzz_step(&mut x, &mut pad);
-    /// assert_eq!(x, awi!(0x1ff_ffffffc0_00000000_u128));
-    /// rng.linear_fuzz_step(&mut x, &mut pad);
-    /// assert_eq!(x, awi!(0xffffffff_fffffe00_3fffffc0_0000000f_u128));
-    /// rng.linear_fuzz_step(&mut x, &mut pad);
-    /// assert_eq!(x, awi!(0xffffffff_e00001ff_c01fffc0_0000000f_u128));
-    /// rng.linear_fuzz_step(&mut x, &mut pad);
-    /// assert_eq!(x, awi!(0x1ffffe00_3fe0003f_fffffff0_u128));
-    /// rng.linear_fuzz_step(&mut x, &mut pad);
-    /// assert_eq!(x, awi!(0xffffffff_e03fffff_c01fffc0_0000000f_u128));
+    /// rng.linear_fuzz_step(&mut x);
+    /// assert_eq!(x, awi!(0x1_ffffffff_f0000000_u128));
+    /// rng.linear_fuzz_step(&mut x);
+    /// assert_eq!(x, awi!(0x3ffff01_ffffffff_f0000000_u128));
+    /// rng.linear_fuzz_step(&mut x);
+    /// assert_eq!(x, awi!(0x3fffcfe_00000001_f0000000_u128));
+    /// rng.linear_fuzz_step(&mut x);
+    /// assert_eq!(x, awi!(0xc000301_fffffffe_0fffff00_u128));
+    /// rng.linear_fuzz_step(&mut x);
+    /// assert_eq!(x, awi!(0xc_0c000301_fffffffe_0fffff00_u128));
     /// ```
-    #[must_use]
-    pub fn linear_fuzz_step(&mut self, x: &mut Bits, pad: &mut Bits) -> Option<()> {
-        if x.bw() != pad.bw() {
-            return None
-        }
-        let r0 = self.index(x.bw()).unwrap();
-        let r1 = self.index(x.bw()).unwrap();
-        pad.umax_();
-        pad.shl_(r0).unwrap();
-        pad.rotl_(r1).unwrap();
+    pub fn linear_fuzz_step(&mut self, x: &mut Bits) {
+        let tmp0 = self.index(x.bw()).unwrap();
+        let tmp1 = self.index(x.bw().wrapping_add(1)).unwrap();
+        let r0 = min(tmp0, tmp1);
+        let r1 = max(tmp0, tmp1);
         // note: it needs to be 2 parts XOR to 1 part OR and 1 part AND, the ordering
         // guarantees this
         if self.next_bool() {
-            x.xor_(pad).unwrap();
+            x.range_xor_(r0..r1).unwrap();
         } else if self.next_bool() {
-            x.or_(pad).unwrap();
+            x.range_or_(r0..r1).unwrap();
         } else {
-            x.and_(pad).unwrap();
+            x.range_and_(r0..r1).unwrap();
         }
-        Some(())
     }
 }
 

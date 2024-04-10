@@ -137,4 +137,35 @@ fn star_rng() {
     for e in slice {
         assert!((e > 9149) && (e < 9513));
     }
+
+    // just to make sure there are not panics
+    let mut x = awi!(0u7);
+    for _ in 0..100 {
+        rng0.linear_fuzz_step(&mut x);
+    }
+}
+
+#[test]
+#[cfg(not(debug_assertions))]
+fn uniform() {
+    let mut rng0 = StarRng::new(0);
+    for max in 0..=255 {
+        let mut slice = [0u32; 256];
+        let n = 1 << 18;
+        for _ in 0..n {
+            slice[usize::from(rng0.uniform_u8(max))] += 1;
+        }
+        for i in ((max as usize) + 1)..256 {
+            assert_eq!(slice[i], 0);
+        }
+        let avg = n / ((max as u32) + 1);
+        // approximate division by square root, with adjustments to reduce freak
+        // outliers to 0
+        let dev = avg.div_ceil(1 << (((avg.next_power_of_two().trailing_zeros() - 1) / 2) - 2));
+        for i in 0..(max as usize) {
+            // check for bias
+            let v = slice[i];
+            assert!((v > (avg - dev)) && (v < (avg + dev)));
+        }
+    }
 }
