@@ -1,4 +1,4 @@
-use std::num::NonZeroUsize;
+use std::{cmp::max, num::NonZeroUsize};
 
 use awint::awi::*;
 use rand_xoshiro::{
@@ -26,7 +26,7 @@ fn rand_choice(
             cc!(tmp, ..; bits).unwrap();
             break
         }
-        match metarng.next_u32() % 7 {
+        match metarng.next_u32() % 8 {
             0 => {
                 cc!(InlAwi::from_bool(rng.next_bool()); bits[used]).unwrap();
                 used += 1;
@@ -58,6 +58,14 @@ fn rand_choice(
                 cc!(tmp; bits[used..(used+w.get())]).unwrap();
                 used += w.get();
             }
+            7 => {
+                let w = NonZeroUsize::new((metarng.next_u32() % 192) as usize + 1).unwrap();
+                let mut tmp = Awi::zero(w);
+                let width = (metarng.next_u32() as usize) % w.get();
+                rng.next_bits_width(&mut tmp, width).unwrap();
+                cc!(tmp[..width]; bits[used..(used+width)]).unwrap();
+                used += width;
+            }
             _ => unreachable!(),
         }
         *actions += 1;
@@ -74,13 +82,13 @@ fn star_rng() {
     let mut bits1 = Awi::zero(bw(N));
     let mut actions = 0;
     rand_choice(&mut metarng, &mut rng0, &mut bits0, &mut actions);
-    assert_eq!(actions, 1307);
+    assert_eq!(actions, 1273);
     actions = 0;
     // the `metarng` is different and will fill `bits1` in a different way, but the
     // overall result should be the same since the buffering is bitwise and `rng0`
     // and `rng1` started with the same bits
     rand_choice(&mut metarng, &mut rng1, &mut bits1, &mut actions);
-    assert_eq!(actions, 1413);
+    assert_eq!(actions, 1338);
     assert_eq!(bits0, bits1);
 
     let mut rng0 = StarRng::new(0);
@@ -129,4 +137,91 @@ fn star_rng() {
     for e in slice {
         assert!((e > 9149) && (e < 9513));
     }
+
+    // just to make sure there are not panics
+    let mut x = awi!(0u7);
+    for _ in 0..100 {
+        rng0.linear_fuzz_step(&mut x);
+    }
+}
+
+#[test]
+#[cfg(not(debug_assertions))]
+fn uniform() {
+    let mut rng0 = StarRng::new(0);
+    for max in 0..=255 {
+        let mut slice = [0u32; 256];
+        let n = 1 << 18;
+        for _ in 0..n {
+            slice[usize::from(rng0.uniform_u8(max))] += 1;
+        }
+        for i in ((max as usize) + 1)..256 {
+            assert_eq!(slice[i], 0);
+        }
+        let avg = n / ((max as u32) + 1);
+        // approximate division by square root, with adjustments to reduce freak
+        // outliers to 0
+        let dev = avg.div_ceil(1 << (((avg.next_power_of_two().trailing_zeros() - 1) / 2) - 2));
+        for i in 0..(max as usize) {
+            // check for bias
+            let v = slice[i];
+            assert!((v > (avg - dev)) && (v < (avg + dev)));
+        }
+    }
+}
+
+#[test]
+fn loops() {
+    // copied from the `index` and `uniform` methods, check that the number of
+    // expected retries is happening
+
+    fn retries(rng: &mut StarRng, len: usize) -> usize {
+        let w = if len >= (1 << (usize::BITS - 1)) {
+            usize::BITS as usize
+        } else {
+            len.next_power_of_two().trailing_zeros() as usize
+        };
+        let mut tmp = InlAwi::from_usize(0);
+        for retry in 0..64 {
+            rng.next_bits_width(&mut tmp, w).unwrap();
+            let test_val = tmp.to_usize();
+            if test_val < len {
+                return retry;
+            }
+        }
+        panic!()
+    }
+
+    let mut rng = StarRng::new(0);
+    let mut max_retries = 0;
+    let mut total = 0;
+    for _ in 0..(1 << 16) {
+        let res = retries(&mut rng, 16);
+        total += res;
+        max_retries = max(max_retries, res);
+    }
+    assert_eq!(max_retries, 0);
+    assert_eq!(total, 0);
+
+    let mut rng = StarRng::new(0);
+    let mut max_retries = 0;
+    let mut total = 0;
+    for _ in 0..(1 << 16) {
+        let res = retries(&mut rng, 15);
+        total += res;
+        max_retries = max(max_retries, res);
+    }
+    assert_eq!(max_retries, 4);
+    assert_eq!(total, 4487);
+
+    let mut rng = StarRng::new(0);
+    let mut max_retries = 0;
+    let mut total = 0;
+    for _ in 0..(1 << 16) {
+        let res = retries(&mut rng, 17);
+        total += res;
+        max_retries = max(max_retries, res);
+    }
+    assert_eq!(max_retries, 17);
+    assert_eq!(total, 58403);
 }
