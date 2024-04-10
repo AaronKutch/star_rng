@@ -1,4 +1,4 @@
-use std::num::NonZeroUsize;
+use std::{cmp::max, num::NonZeroUsize};
 
 use awint::awi::*;
 use rand_xoshiro::{
@@ -168,4 +168,60 @@ fn uniform() {
             assert!((v > (avg - dev)) && (v < (avg + dev)));
         }
     }
+}
+
+#[test]
+fn loops() {
+    // copied from the `index` and `uniform` methods, check that the number of
+    // expected retries is happening
+
+    fn retries(rng: &mut StarRng, len: usize) -> usize {
+        let w = if len >= (1 << (usize::BITS - 1)) {
+            usize::BITS as usize
+        } else {
+            len.next_power_of_two().trailing_zeros() as usize
+        };
+        let mut tmp = InlAwi::from_usize(0);
+        for retry in 0..64 {
+            rng.next_bits_width(&mut tmp, w).unwrap();
+            let test_val = tmp.to_usize();
+            if test_val < len {
+                return retry;
+            }
+        }
+        panic!()
+    }
+
+    let mut rng = StarRng::new(0);
+    let mut max_retries = 0;
+    let mut total = 0;
+    for _ in 0..(1 << 16) {
+        let res = retries(&mut rng, 16);
+        total += res;
+        max_retries = max(max_retries, res);
+    }
+    assert_eq!(max_retries, 0);
+    assert_eq!(total, 0);
+
+    let mut rng = StarRng::new(0);
+    let mut max_retries = 0;
+    let mut total = 0;
+    for _ in 0..(1 << 16) {
+        let res = retries(&mut rng, 15);
+        total += res;
+        max_retries = max(max_retries, res);
+    }
+    assert_eq!(max_retries, 4);
+    assert_eq!(total, 4487);
+
+    let mut rng = StarRng::new(0);
+    let mut max_retries = 0;
+    let mut total = 0;
+    for _ in 0..(1 << 16) {
+        let res = retries(&mut rng, 17);
+        total += res;
+        max_retries = max(max_retries, res);
+    }
+    assert_eq!(max_retries, 17);
+    assert_eq!(total, 58403);
 }
