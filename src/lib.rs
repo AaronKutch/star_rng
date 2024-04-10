@@ -85,6 +85,7 @@ macro_rules! out_of {
 }
 
 impl StarRng {
+    /// The bitwidth of the internal buffer as a `u8`
     const BW_U8: u8 = 64;
 
     next!(
@@ -142,21 +143,34 @@ impl StarRng {
         }
     }
 
-    /// Assigns random value to `bits`
-    pub fn next_bits(&mut self, bits: &mut Bits) {
+    /// Assigns random value to `bits[..width]`, zeroing the rest of the bits.
+    /// Returns `None` if `width > bits.bw()`.
+    #[must_use]
+    pub fn next_bits_width(&mut self, bits: &mut Bits, width: usize) -> Option<()> {
+        if width > bits.bw() {
+            return None
+        }
+        bits.zero_();
+        if width == 0 {
+            return Some(())
+        }
         let mut processed = 0;
         loop {
             let remaining_in_buf = usize::from(Self::BW_U8.wrapping_sub(self.used));
-            let remaining = bits.bw().wrapping_sub(processed);
+            let remaining = width.wrapping_sub(processed);
             if remaining == 0 {
                 break
             }
+            // TODO use `digit_or_` for better perf, but then we need to handle differing
+            // `Digit` sizes and test appropriately
             if remaining < remaining_in_buf {
                 bits.field(processed, &self.buf, usize::from(self.used), remaining)
                     .unwrap();
                 self.used = self.used.wrapping_add(remaining as u8);
                 break
             } else {
+                // in the middle iterations of the loop, `remaining_in_buf` will be `BW_U8` bits
+                // which leads to a more optimized `field` path on most platforms
                 bits.field(
                     processed,
                     &self.buf,
@@ -169,6 +183,12 @@ impl StarRng {
                 self.used = 0;
             }
         }
+        Some(())
+    }
+
+    /// Assigns random value to `bits`
+    pub fn next_bits(&mut self, bits: &mut Bits) {
+        self.next_bits_width(bits, bits.bw()).unwrap();
     }
 
     /// Returns a random index, given an exclusive maximum of `len`. Returns

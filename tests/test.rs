@@ -26,7 +26,7 @@ fn rand_choice(
             cc!(tmp, ..; bits).unwrap();
             break
         }
-        match metarng.next_u32() % 7 {
+        match metarng.next_u32() % 8 {
             0 => {
                 cc!(InlAwi::from_bool(rng.next_bool()); bits[used]).unwrap();
                 used += 1;
@@ -58,6 +58,14 @@ fn rand_choice(
                 cc!(tmp; bits[used..(used+w.get())]).unwrap();
                 used += w.get();
             }
+            7 => {
+                let w = NonZeroUsize::new((metarng.next_u32() % 192) as usize + 1).unwrap();
+                let mut tmp = Awi::zero(w);
+                let width = (metarng.next_u32() as usize) % w.get();
+                rng.next_bits_width(&mut tmp, width).unwrap();
+                cc!(tmp[..width]; bits[used..(used+width)]).unwrap();
+                used += width;
+            }
             _ => unreachable!(),
         }
         *actions += 1;
@@ -74,13 +82,13 @@ fn star_rng() {
     let mut bits1 = Awi::zero(bw(N));
     let mut actions = 0;
     rand_choice(&mut metarng, &mut rng0, &mut bits0, &mut actions);
-    assert_eq!(actions, 1307);
+    assert_eq!(actions, 1273);
     actions = 0;
     // the `metarng` is different and will fill `bits1` in a different way, but the
     // overall result should be the same since the buffering is bitwise and `rng0`
     // and `rng1` started with the same bits
     rand_choice(&mut metarng, &mut rng1, &mut bits1, &mut actions);
-    assert_eq!(actions, 1413);
+    assert_eq!(actions, 1338);
     assert_eq!(bits0, bits1);
 
     let mut rng0 = StarRng::new(0);
