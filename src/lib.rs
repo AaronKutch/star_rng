@@ -3,10 +3,8 @@
 use core::cmp::{max, min};
 
 use awint::awi::*;
-use rand_xoshiro::{
-    rand_core::{RngCore, SeedableRng},
-    Xoshiro128StarStar,
-};
+use rand_core::{RngCore, SeedableRng};
+use rand_xoshiro::Xoshiro128StarStar;
 
 /// A PRNG (psuedorandom number generator).
 ///
@@ -347,13 +345,6 @@ impl RngCore for StarRng {
         for byte in dest {
             *byte = self.next_u8();
         }
-    }
-
-    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand_xoshiro::rand_core::Error> {
-        for byte in dest {
-            *byte = self.next_u8();
-        }
-        Ok(())
     }
 }
 
