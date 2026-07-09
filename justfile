@@ -32,6 +32,7 @@ test *ARGS:
 test_all *ARGS:
   {{cargo}} sort -cw
   {{cargo}} doc --no-deps
+  {{cargo}} nextest run --no-default-features {{ARGS}}
   {{cargo}} nextest run --all-features {{ARGS}}
   {{cargo}} t --doc --all-features {{ARGS}}
   # needs the pinned toolchain

@@ -1,8 +1,6 @@
-use std::{cmp::max,};
+use std::cmp::max;
 
-use rand_xoshiro::{
-    rand_core::{Rng},
-};
+use rand_xoshiro::rand_core::Rng;
 use star_rng::StarRng;
 
 // downstream crates will rely on a deterministic behavior
@@ -46,6 +44,7 @@ fn test_vectors() {
 
     #[cfg(feature = "awint_support")]
     {
+        use awint::awi::*;
         let mut bits = inlawi!(umax: ..70);
         rng.next_bits(&mut bits);
         assert_eq!(bits, inlawi!(0xf_3d737c42_e7a9e29d_u70));
@@ -62,13 +61,17 @@ fn test_vectors() {
     }
 }
 
-    #[cfg(feature = "awint_support")]
+#[cfg(feature = "awint_support")]
 fn rand_choice(
-    metarng: &mut Xoshiro128StarStar,
+    metarng: &mut rand_xoshiro::Xoshiro128StarStar,
     rng: &mut StarRng,
-    mut bits: &mut Bits,
+    mut bits: &mut awint::Bits,
     actions: &mut u64,
 ) {
+    use std::num::NonZeroUsize;
+
+    use awint::awi::*;
+
     let mut used = 0;
     loop {
         let remaining = bits.bw() - used;
@@ -131,8 +134,11 @@ fn rand_choice(
 #[test]
 #[cfg(feature = "awint_support")]
 fn test_rand_support() {
-            const N: usize = 1 << 16;
-    let mut metarng = Xoshiro128StarStar::seed_from_u64(1);
+    use awint::awi::*;
+
+    const N: usize = 1 << 16;
+    let mut metarng =
+        <rand_xoshiro::Xoshiro128StarStar as rand_core::SeedableRng>::seed_from_u64(1);
     let mut rng0 = StarRng::new(0);
     let mut rng1 = StarRng::new(0);
     let mut bits0 = Awi::zero(bw(N));
@@ -148,11 +154,11 @@ fn test_rand_support() {
     assert_eq!(actions, 1338);
     assert_eq!(bits0, bits1);
 
-        // just to make sure there are not panics
-        let mut x = awi!(0u7);
-        for _ in 0..100 {
-            rng0.linear_fuzz_step(&mut x);
-        }
+    // just to make sure there are not panics
+    let mut x = awi!(0u7);
+    for _ in 0..100 {
+        rng0.linear_fuzz_step(&mut x);
+    }
 }
 
 #[test]

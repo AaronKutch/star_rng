@@ -382,12 +382,11 @@ impl StarRng {
         slice.get_mut(inx)
     }
 
-    /*
     /// Assigns random value to `bits[..width]`, zeroing the rest of the bits.
     /// Returns `None` if `width > bits.bw()`.
     #[must_use]
     #[cfg(feature = "awint_support")]
-    pub fn next_bits_width(&mut self, bits: &mut Bits, width: usize) -> Option<()> {
+    pub fn next_bits_width(&mut self, bits: &mut awint::Bits, mut width: usize) -> Option<()> {
         if width > bits.bw() {
             return None;
         }
@@ -395,41 +394,25 @@ impl StarRng {
         if width == 0 {
             return Some(());
         }
-        let mut processed = 0;
+        let mut tmp = awint::InlAwi::from_u32(0);
+        let mut shl = 0;
         loop {
-            let remaining_in_buf = usize::from(Self::BW_U8.wrapping_sub(self.0aei));
-            let remaining = width.wrapping_sub(processed);
-            if remaining == 0 {
+            if width < BW {
+                tmp.u32_(self.consume(width as u8));
+                bits.field_to(shl, &tmp, width).unwrap();
                 break;
             }
-            // TODO use `digit_or_` for better perf, but then we need to handle differing
-            // `Digit` sizes and test appropriately
-            if remaining < remaining_in_buf {
-                bits.field(processed, &self.buf, usize::from(self.0aei), remaining)
-                    .unwrap();
-                self.0aei = self.0aei.wrapping_add(remaining as u8);
-                break;
-            } else {
-                // in the middle iterations of the loop, `remaining_in_buf` will be `BW_U8` bits
-                // which leads to a more optimized `field` path on most platforms
-                bits.field(
-                    processed,
-                    &self.buf,
-                    usize::from(self.0aei),
-                    remaining_in_buf,
-                )
-                .unwrap();
-                processed = processed.wrapping_add(remaining_in_buf);
-                self.buf = InlAwi::from_u32(self.rng.next_u32());
-                self.0aei = 0;
-            }
+            tmp.u32_(self.next_u32());
+            bits.field_to(shl, &tmp, 32).unwrap();
+            width -= 32;
+            shl += 32;
         }
         Some(())
     }
 
     /// Assigns random value to `bits`
     #[cfg(feature = "awint_support")]
-    pub fn next_bits(&mut self, bits: &mut Bits) {
+    pub fn next_bits(&mut self, bits: &mut awint::Bits) {
         self.next_bits_width(bits, bits.bw()).unwrap();
     }
 
@@ -462,11 +445,11 @@ impl StarRng {
     /// assert_eq!(x, awi!(0xc_0c000301_fffffffe_0fffff00_u128));
     /// ```
     #[cfg(feature = "awint_support")]
-    pub fn linear_fuzz_step(&mut self, x: &mut Bits) {
+    pub fn linear_fuzz_step(&mut self, x: &mut awint::Bits) {
         let tmp0 = self.index(x.bw()).unwrap();
         let tmp1 = self.index(x.bw().wrapping_add(1)).unwrap();
-        let r0 = min(tmp0, tmp1);
-        let r1 = max(tmp0, tmp1);
+        let r0 = core::cmp::min(tmp0, tmp1);
+        let r1 = core::cmp::max(tmp0, tmp1);
         // note: it needs to be 2 parts XOR to 1 part OR and 1 part AND, the ordering
         // guarantees this
         if self.next_bool() {
@@ -476,5 +459,5 @@ impl StarRng {
         } else {
             x.range_and_(r0..r1).unwrap();
         }
-    }*/
+    }
 }
