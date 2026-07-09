@@ -22,4 +22,4 @@ rand_xoshiro = { version = "0.7", default-features = false }
 
 [dev-dependencies]
 #awint = { path = "./../awint/awint", default-features = false, features = ["alloc"]}
-awint = { version = "0.18", default-features = false, features = ["alloc"] }
+awint = { version = "0.18", default-features = false, features = ["alloc", "rand_support"] }

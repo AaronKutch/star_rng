@@ -7,6 +7,60 @@ use rand_xoshiro::{
 };
 use star_rng::StarRng;
 
+// downstream crates will rely on a deterministic behavior
+#[test]
+#[allow(clippy::bool_assert_comparison)]
+fn test_vectors() {
+    let mut rng = StarRng::new(0);
+    let mut dst = [0; 65];
+    rng.fill_bytes(&mut dst);
+    assert_eq!(dst, [
+        93, 4, 201, 222, 117, 157, 8, 154, 98, 211, 119, 171, 5, 100, 225, 195, 218, 168, 149, 92,
+        86, 160, 222, 96, 64, 81, 90, 194, 20, 6, 41, 164, 175, 37, 5, 158, 185, 55, 61, 149, 119,
+        59, 151, 202, 87, 132, 44, 54, 8, 210, 248, 126, 178, 2, 132, 201, 166, 209, 126, 231, 27,
+        64, 168, 234, 98
+    ]);
+
+    assert_eq!(rng.index(1 << 15).unwrap(), 27303);
+    assert_eq!(*rng.index_slice(&dst).unwrap(), 5);
+    assert_eq!(*rng.index_slice_mut(&mut dst).unwrap(), 231);
+    assert_eq!(rng.next_bool(), false);
+    assert_eq!(rng.next_u8(), 60);
+    assert_eq!(rng.next_u16(), 55860);
+    assert_eq!(rng.next_u32(), 1142491458);
+    assert_eq!(rng.next_u64(), 7750222263744231949);
+    assert_eq!(rng.next_u128(), 107347936578185361932231794775361051828);
+    assert_eq!(rng.out_of_4(1), false);
+    assert_eq!(rng.out_of_8(3), true);
+    assert_eq!(rng.out_of_16(7), true);
+    assert_eq!(rng.out_of_32(20), false);
+    assert_eq!(rng.out_of_64(31), true);
+    assert_eq!(rng.out_of_128(50), false);
+    assert_eq!(rng.out_of_256(100), false);
+    assert_eq!(rng.uniform_u8(u8::MAX / 8), 31);
+    assert_eq!(rng.uniform_u16(u16::MAX / 8), 2436);
+    assert_eq!(rng.uniform_u32(u32::MAX / 8), 414907957);
+    assert_eq!(rng.uniform_u64(u64::MAX / 8), 1339345442184903593);
+    assert_eq!(
+        rng.uniform_u128(u128::MAX / 8),
+        13939501709697904127631821811304380035
+    );
+
+    let mut bits = inlawi!(umax: ..70);
+    rng.next_bits(&mut bits);
+    assert_eq!(bits, inlawi!(0xf_3d737c42_e7a9e29d_u70));
+    bits.rand_(&mut rng);
+    assert_eq!(bits, inlawi!(0x5_d8de04d7_e0615878_u70));
+    rng.next_bits_width(&mut bits, 40).unwrap();
+    assert_eq!(bits, inlawi!(0x4f_d41b7a25_u70));
+    rng.linear_fuzz_step(&mut bits);
+    assert_eq!(bits, inlawi!(0x1f_ffffffb0_2be485dd_u70));
+    rng.linear_fuzz_step(&mut bits);
+    assert_eq!(bits, inlawi!(0x1f_ffffffff_ffe485dd_u70));
+    rng.linear_fuzz_step(&mut bits);
+    assert_eq!(bits, inlawi!(0x7_ffe48580_u70));
+}
+
 fn rand_choice(
     metarng: &mut Xoshiro128StarStar,
     rng: &mut StarRng,
