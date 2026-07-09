@@ -5,8 +5,15 @@ use core::{convert::Infallible, num::NonZeroU8};
 use rand_core::{Rng, SeedableRng, TryRng};
 use rand_xoshiro::Xoshiro128StarStar;
 
-// the maximum number of retries for trying something that has as low as a 1/2 probability of happening
+// the maximum number of retries for trying something that has as low as a 1/2
+// probability of happening
 const MAX_RETRIES: usize = 64;
+
+// NOTE in this file, only use `internal_next_u32` in place of any `next_u32`
+// call, there are too many ways to accidentally recurse and it is better for
+// inlining anyways (note we implement an associated `next_u32` method and
+// creation function that are redundant with the rand_core traits, because we
+// want to prevent the need to import them in many use cases)
 
 /// A PRNG (psuedorandom number generator).
 ///
@@ -57,7 +64,7 @@ impl TryRng for StarRng {
     }
 
     fn try_next_u64(&mut self) -> Result<u64, Self::Error> {
-        Ok((self.next_u32() as u64) | ((self.next_u32() as u64) << 32))
+        Ok((self.internal_next_u32() as u64) | ((self.internal_next_u32() as u64) << 32))
     }
 
     fn try_fill_bytes(&mut self, dst: &mut [u8]) -> Result<(), Self::Error> {
@@ -68,12 +75,12 @@ impl TryRng for StarRng {
                 if rem == 0 {
                     break;
                 }
-                dst[i..].copy_from_slice(&self.consume((rem * 8) as u8).to_be_bytes());
+                dst[i..].copy_from_slice(&self.consume((rem * 8) as u8).to_le_bytes()[..rem]);
                 break;
             }
             // safe by isize::MAX limit
             let next = i.wrapping_add(4);
-            dst[i..next].copy_from_slice(&self.next_u32().to_le_bytes());
+            dst[i..next].copy_from_slice(&self.internal_next_u32().to_le_bytes());
             i = next;
         }
         Ok(())
@@ -104,10 +111,12 @@ macro_rules! next_width {
                     let mut shl = 0;
                     loop {
                         if width < BW {
-                            res |= (self.consume(width as u8) as $x) << shl;
+                            if width != 0 {
+                                res |= (self.consume(width as u8) as $x) << shl;
+                            }
                             break
                         }
-                        res |= (self.next_u32() as $x) << shl;
+                        res |= (self.internal_next_u32() as $x) << shl;
                         width -= 32;
                         shl += 32;
                     }
@@ -129,7 +138,7 @@ macro_rules! next {
                     let mut res: $x = 0;
                     let mut shl = 0usize;
                     for _ in 0..($x::BITS / u32::BITS) {
-                        res |= (self.next_u32() as $x) << shl;
+                        res |= (self.internal_next_u32() as $x) << shl;
                         shl += 32;
                     }
                     res
@@ -247,6 +256,20 @@ impl StarRng {
         }
     }
 
+    fn internal_next_u32(&mut self) -> u32 {
+        // special casing, no updates to `used` since it is modulo 32
+        let res = self.buf0;
+        self.buf0 = self.buf1;
+        let new = self.rng.next_u32();
+        if self.used == BW_U {
+            self.buf1 = new;
+        } else {
+            self.buf0 |= new << u(self.used);
+            self.buf1 = new >> u(self.used);
+        }
+        res
+    }
+
     /// Returns a random boolean
     pub fn next_bool(&mut self) -> bool {
         // special case everything
@@ -273,7 +296,7 @@ impl StarRng {
             return 0;
         }
         if bits == BW_U.get() {
-            return self.next_u32();
+            return self.internal_next_u32();
         }
         let res = self.buf0 & (u32::MAX >> (BW_U.get() - bits));
         self.buf0 >>= bits;
@@ -309,10 +332,12 @@ impl StarRng {
             let mut shl = 0;
             loop {
                 if bits < BW {
-                    res |= (self.consume(bits as u8) as usize) << shl;
+                    if bits != 0 {
+                        res |= (self.consume(bits as u8) as usize) << shl;
+                    }
                     break res;
                 }
-                res |= (self.next_u32() as usize) << shl;
+                res |= (self.internal_next_u32() as usize) << shl;
                 bits -= 32;
                 shl += 32;
             }
@@ -396,7 +421,7 @@ impl StarRng {
                 bits.field_to(shl, &tmp, width).unwrap();
                 break;
             }
-            tmp.u32_(self.next_u32());
+            tmp.u32_(self.internal_next_u32());
             bits.field_to(shl, &tmp, 32).unwrap();
             width -= 32;
             shl += 32;
