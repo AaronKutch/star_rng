@@ -48,25 +48,11 @@ fn checked_sub(lhs: NonZeroU8, rhs: u8) -> Option<NonZeroU8> {
     NonZeroU8::new(lhs.get().checked_sub(rhs)?)
 }
 
-fn u(x: NonZeroU8) -> usize {
-    usize::from(x.get())
-}
-
 impl TryRng for StarRng {
     type Error = Infallible;
 
     fn try_next_u32(&mut self) -> Result<u32, Self::Error> {
-        // special casing, no updates to `used` since it is modulo 32
-        let res = self.buf0;
-        self.buf0 = self.buf1;
-        let new = self.rng.next_u32();
-        if self.used == BW_U {
-            self.buf1 = new;
-        } else {
-            self.buf0 |= new << u(self.used);
-            self.buf1 = new >> u(self.used);
-        }
-        Ok(res)
+        Ok(self.internal_next_u32())
     }
 
     fn try_next_u64(&mut self) -> Result<u64, Self::Error> {
@@ -270,8 +256,8 @@ impl StarRng {
         if self.used == BW_U {
             self.buf1 = new;
         } else {
-            self.buf0 |= new << u(self.used);
-            self.buf1 = new >> u(self.used);
+            self.buf0 |= new << (BW_U.get() - self.used.get());
+            self.buf1 = new >> self.used.get();
         }
         res
     }
