@@ -9,6 +9,8 @@ use awint::awi::*;
 use rand_core::{Rng, SeedableRng, TryRng};
 use rand_xoshiro::Xoshiro128StarStar;
 
+const MAX_RETRIES: usize = 64;
+
 /// A PRNG (psuedorandom number generator).
 ///
 /// This is an opinionated wrapper around [rand_xoshiro::Xoshiro128StarStar]
@@ -18,7 +20,7 @@ use rand_xoshiro::Xoshiro128StarStar;
 #[derive(Debug)]
 pub struct StarRng {
     rng: Xoshiro128StarStar,
-    buf: inlawi_ty!(64),
+    buf: inlawi_ty!(32),
     // invariant: `used < buf.bw()` and indicates the number of bits used out of `buf`
     used: u8,
 }
@@ -53,7 +55,7 @@ macro_rules! next {
                             remaining_in_buf
                         ).unwrap();
                         processed = processed.wrapping_add(remaining_in_buf);
-                        self.buf = InlAwi::from_u64(self.rng.next_u64());
+                        self.buf = InlAwi::from_u32(self.rng.next_u32());
                         self.used = 0;
                     }
                 }
@@ -110,7 +112,7 @@ macro_rules! uniform {
                     // TODO are there any ill states that `Xoshiro128StarStar` can get into?
                     // In case of such a state, we have a finite
                     // number of loops to guarantee termination
-                    for _ in 0..64 {
+                    for _ in 0..MAX_RETRIES {
                         self.next_bits_width(&mut tmp, w).unwrap();
                         let test_val = tmp.$to_x();
                         if test_val <= max {
@@ -130,7 +132,7 @@ macro_rules! uniform {
 
 impl StarRng {
     /// The bitwidth of the internal buffer as a `u8`
-    const BW_U8: u8 = 64;
+    const BW_U8: u8 = 32;
 
     next!(
         next_u8 u8 from_u8 to_u8,
@@ -163,7 +165,7 @@ impl StarRng {
     /// Creates a new `StarRng` with the given seed
     pub fn new(seed: u64) -> Self {
         let mut rng = Xoshiro128StarStar::seed_from_u64(seed);
-        let buf = InlAwi::from_u64(rng.next_u64());
+        let buf = InlAwi::from_u32(rng.next_u32());
         Self { rng, buf, used: 0 }
     }
 
@@ -172,7 +174,7 @@ impl StarRng {
         let res = self.buf.get(usize::from(self.used)).unwrap();
         self.used += 1;
         if self.used >= Self::BW_U8 {
-            self.buf = InlAwi::from_u64(self.rng.next_u64());
+            self.buf = InlAwi::from_u32(self.rng.next_u32());
             self.used = 0;
         }
         res
@@ -231,7 +233,7 @@ impl StarRng {
                 )
                 .unwrap();
                 processed = processed.wrapping_add(remaining_in_buf);
-                self.buf = InlAwi::from_u64(self.rng.next_u64());
+                self.buf = InlAwi::from_u32(self.rng.next_u32());
                 self.used = 0;
             }
         }
@@ -259,7 +261,7 @@ impl StarRng {
             // TODO are there any ill states that `Xoshiro128StarStar` can get into?
             // In case of such a state, we have a finite
             // number of loops to guarantee termination
-            for _ in 0..64 {
+            for _ in 0..MAX_RETRIES {
                 self.next_bits_width(&mut tmp, w).unwrap();
                 let test_val = tmp.to_usize();
                 if test_val < len {
