@@ -1,9 +1,7 @@
-use std::{cmp::max, num::NonZeroUsize};
+use std::{cmp::max,};
 
-use awint::awi::*;
 use rand_xoshiro::{
-    Xoshiro128StarStar,
-    rand_core::{Rng, SeedableRng},
+    rand_core::{Rng},
 };
 use star_rng::StarRng;
 
@@ -46,21 +44,25 @@ fn test_vectors() {
         13939501709697904127631821811304380035
     );
 
-    let mut bits = inlawi!(umax: ..70);
-    rng.next_bits(&mut bits);
-    assert_eq!(bits, inlawi!(0xf_3d737c42_e7a9e29d_u70));
-    bits.rand_(&mut rng);
-    assert_eq!(bits, inlawi!(0x5_d8de04d7_e0615878_u70));
-    rng.next_bits_width(&mut bits, 40).unwrap();
-    assert_eq!(bits, inlawi!(0x4f_d41b7a25_u70));
-    rng.linear_fuzz_step(&mut bits);
-    assert_eq!(bits, inlawi!(0x1f_ffffffb0_2be485dd_u70));
-    rng.linear_fuzz_step(&mut bits);
-    assert_eq!(bits, inlawi!(0x1f_ffffffff_ffe485dd_u70));
-    rng.linear_fuzz_step(&mut bits);
-    assert_eq!(bits, inlawi!(0x7_ffe48580_u70));
+    #[cfg(feature = "awint_support")]
+    {
+        let mut bits = inlawi!(umax: ..70);
+        rng.next_bits(&mut bits);
+        assert_eq!(bits, inlawi!(0xf_3d737c42_e7a9e29d_u70));
+        bits.rand_(&mut rng);
+        assert_eq!(bits, inlawi!(0x5_d8de04d7_e0615878_u70));
+        rng.next_bits_width(&mut bits, 40).unwrap();
+        assert_eq!(bits, inlawi!(0x4f_d41b7a25_u70));
+        rng.linear_fuzz_step(&mut bits);
+        assert_eq!(bits, inlawi!(0x1f_ffffffb0_2be485dd_u70));
+        rng.linear_fuzz_step(&mut bits);
+        assert_eq!(bits, inlawi!(0x1f_ffffffff_ffe485dd_u70));
+        rng.linear_fuzz_step(&mut bits);
+        assert_eq!(bits, inlawi!(0x7_ffe48580_u70));
+    }
 }
 
+    #[cfg(feature = "awint_support")]
 fn rand_choice(
     metarng: &mut Xoshiro128StarStar,
     rng: &mut StarRng,
@@ -127,8 +129,9 @@ fn rand_choice(
 }
 
 #[test]
-fn star_rng() {
-    const N: usize = 1 << 16;
+#[cfg(feature = "awint_support")]
+fn test_rand_support() {
+            const N: usize = 1 << 16;
     let mut metarng = Xoshiro128StarStar::seed_from_u64(1);
     let mut rng0 = StarRng::new(0);
     let mut rng1 = StarRng::new(0);
@@ -145,6 +148,15 @@ fn star_rng() {
     assert_eq!(actions, 1338);
     assert_eq!(bits0, bits1);
 
+        // just to make sure there are not panics
+        let mut x = awi!(0u7);
+        for _ in 0..100 {
+            rng0.linear_fuzz_step(&mut x);
+        }
+}
+
+#[test]
+fn star_rng() {
     let mut rng0 = StarRng::new(0);
     let mut yes = 0u64;
     for _ in 0..(1 << 16) {
@@ -191,12 +203,6 @@ fn star_rng() {
     for e in slice {
         assert!((e > 9149) && (e < 9513));
     }
-
-    // just to make sure there are not panics
-    let mut x = awi!(0u7);
-    for _ in 0..100 {
-        rng0.linear_fuzz_step(&mut x);
-    }
 }
 
 #[test]
@@ -235,10 +241,8 @@ fn loops() {
         } else {
             len.next_power_of_two().trailing_zeros() as usize
         };
-        let mut tmp = InlAwi::from_usize(0);
         for retry in 0..64 {
-            rng.next_bits_width(&mut tmp, w).unwrap();
-            let test_val = tmp.to_usize();
+            let test_val = rng.next_width_u128(w).unwrap() as usize;
             if test_val < len {
                 return retry;
             }
