@@ -1,6 +1,6 @@
 #![no_std]
 
-use core::{convert::Infallible, num::NonZeroU8};
+use core::{convert::Infallible, fmt, num::NonZeroU8};
 
 use rand_core::{Rng, SeedableRng, TryRng};
 use rand_xoshiro::Xoshiro128StarStar;
@@ -21,7 +21,6 @@ const MAX_RETRIES: usize = 64;
 /// that buffers rng calls down to the bit level for even higher performance.
 /// This is _not_ suitable for cryptographic purposes, but rather is meant for
 /// deterministic fuzzing tests and more.
-#[derive(Debug)]
 pub struct StarRng {
     rng: Xoshiro128StarStar,
     // this is always filled with valid bits, shifting LSB-wards from `buf1` as they are consumed
@@ -31,6 +30,13 @@ pub struct StarRng {
     buf1: u32,
     // Used bits in `buf1`, must be at most `BW`
     used: NonZeroU8,
+}
+
+// this is to make it easier to put in things and throw Debug on them
+impl fmt::Debug for StarRng {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("StarRng").finish()
+    }
 }
 
 /// The bitwidth of the internal buffer
@@ -301,7 +307,7 @@ impl StarRng {
         let res = self.buf0 & (u32::MAX >> (BW_U.get() - bits));
         self.buf0 >>= bits;
         // there can be unused bits shifted in after used bits, we will OR in the rest
-        self.buf0 |= self.buf1 << bits;
+        self.buf0 |= self.buf1 << (BW_U.get() - bits);
         self.buf1 >>= bits;
         if let Some(next) = checked_sub(self.used, bits) {
             // drawdown
