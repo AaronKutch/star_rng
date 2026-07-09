@@ -5,7 +5,7 @@ use core::{convert::Infallible, num::NonZeroU8};
 use rand_core::{Rng, SeedableRng, TryRng};
 use rand_xoshiro::Xoshiro128StarStar;
 
-// FIXME just add on 8 bits for all the probabilistic ones and make this one 8
+// the maximum number of retries for trying something that has as low as a 1/2 probability of happening
 const MAX_RETRIES: usize = 64;
 
 /// A PRNG (psuedorandom number generator).
@@ -180,9 +180,6 @@ macro_rules! uniform {
                     } else {
                         max.wrapping_add(1).next_power_of_two().trailing_zeros() as usize
                     };
-                    // TODO are there any ill states that `Xoshiro128StarStar` can get into?
-                    // In case of such a state, we have a finite
-                    // number of loops to guarantee termination
                     for _ in 0..MAX_RETRIES {
                         let test_val = self.$next_width(w).unwrap();
                         if test_val <= max {
@@ -350,9 +347,6 @@ impl StarRng {
             } else {
                 len.next_power_of_two().trailing_zeros() as usize
             };
-            // TODO are there any ill states that `Xoshiro128StarStar` can get into?
-            // In case of such a state, we have a finite
-            // number of loops to guarantee termination
             for _ in 0..MAX_RETRIES {
                 let test_val = self.consume_usize(w);
                 if test_val < len {
