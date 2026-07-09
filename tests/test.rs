@@ -3,7 +3,7 @@ use std::{cmp::max, num::NonZeroUsize};
 use awint::awi::*;
 use rand_xoshiro::{
     Xoshiro128StarStar,
-    rand_core::{RngCore, SeedableRng},
+    rand_core::{Rng, SeedableRng},
 };
 use star_rng::StarRng;
 
