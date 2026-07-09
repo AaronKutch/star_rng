@@ -197,18 +197,18 @@ impl StarRng {
     #[must_use]
     pub fn next_bits_width(&mut self, bits: &mut Bits, width: usize) -> Option<()> {
         if width > bits.bw() {
-            return None
+            return None;
         }
         bits.zero_();
         if width == 0 {
-            return Some(())
+            return Some(());
         }
         let mut processed = 0;
         loop {
             let remaining_in_buf = usize::from(Self::BW_U8.wrapping_sub(self.used));
             let remaining = width.wrapping_sub(processed);
             if remaining == 0 {
-                break
+                break;
             }
             // TODO use `digit_or_` for better perf, but then we need to handle differing
             // `Digit` sizes and test appropriately
@@ -216,7 +216,7 @@ impl StarRng {
                 bits.field(processed, &self.buf, usize::from(self.used), remaining)
                     .unwrap();
                 self.used = self.used.wrapping_add(remaining as u8);
-                break
+                break;
             } else {
                 // in the middle iterations of the loop, `remaining_in_buf` will be `BW_U8` bits
                 // which leads to a more optimized `field` path on most platforms

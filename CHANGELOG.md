@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.3.0] - TODO
+### Crate
+- Set the MSRV to 1.86
+- removed dependency on `awint`, so that it can be used by more crates and is more optimized
+
 ## [0.2.0] - 2025-02-11
 ### Crate
 - `rand_core` 0.9

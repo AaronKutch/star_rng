@@ -1,7 +1,10 @@
 [package]
 name = "star_rng"
 version = "0.2.0"
-edition = "2021"
+edition = "2024"
+# when updating, update `rust-msrv` in flake.nix and `stable_build` in ci.yml, and separately
+# bump rust-toolchain.toml
+rust-version = "1.86"
 authors = ["Aaron Kutch <aaronkutch@att.net>"]
 license = "MIT OR Apache-2.0"
 readme = "README.md"
@@ -14,8 +17,8 @@ categories = ["algorithms", "no-std"]
 [dependencies]
 #awint = { path = "./../awint/awint", default-features = false }
 awint = { version = "0.18", default-features = false }
-rand_xoshiro = { version = "0.7", default-features = false }
 rand_core = { version = "0.9" }
+rand_xoshiro = { version = "0.7", default-features = false }
 
 [dev-dependencies]
 #awint = { path = "./../awint/awint", default-features = false, features = ["alloc"]}

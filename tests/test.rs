@@ -2,8 +2,8 @@ use std::{cmp::max, num::NonZeroUsize};
 
 use awint::awi::*;
 use rand_xoshiro::{
-    rand_core::{RngCore, SeedableRng},
     Xoshiro128StarStar,
+    rand_core::{RngCore, SeedableRng},
 };
 use star_rng::StarRng;
 
@@ -17,14 +17,14 @@ fn rand_choice(
     loop {
         let remaining = bits.bw() - used;
         if remaining == 0 {
-            break
+            break;
         }
         if remaining < 192 {
             // need to fill up without encountering a potential overflow case
             let mut tmp = Awi::zero(NonZeroUsize::new(remaining).unwrap());
             rng.next_bits(&mut tmp);
             cc!(tmp, ..; bits).unwrap();
-            break
+            break;
         }
         match metarng.next_u32() % 8 {
             0 => {
