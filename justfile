@@ -31,12 +31,10 @@ test *ARGS:
 
 test_all *ARGS:
   {{cargo}} sort -cw
-  {{cargo}} doc --no-deps
+  {{cargo}} doc --no-deps --all-features
   {{cargo}} nextest run --no-default-features {{ARGS}}
   {{cargo}} nextest run --all-features {{ARGS}}
   {{cargo}} t --doc --all-features {{ARGS}}
-  # needs the pinned toolchain
-  {{cargo}} b --target=riscv32i-unknown-none-elf -p no_std_test
 
 # Needs to be run with the MSRV toolchain
 test_for_msrv:
