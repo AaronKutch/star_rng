@@ -256,8 +256,8 @@ impl StarRng {
         if self.used == BW_U {
             self.buf1 = new;
         } else {
-            self.buf0 |= new << (BW_U.get() - self.used.get());
-            self.buf1 = new >> self.used.get();
+            self.buf0 |= new << self.used.get();
+            self.buf1 = new >> (BW_U.get() - self.used.get());
         }
         res
     }

@@ -164,50 +164,52 @@ fn test_rand_support() {
 #[test]
 fn star_rng() {
     let mut rng0 = StarRng::new(0);
+    let n = 1_000_000;
+
     let mut yes = 0u64;
-    for _ in 0..(1 << 16) {
+    for _ in 0..n {
         yes += rng0.out_of_128(42) as u64;
     }
-    assert_eq!(yes, 21597);
+    assert_eq!(yes, 327464);
     let mut yes = 0u64;
-    for _ in 0..(1 << 16) {
+    for _ in 0..n {
         yes += rng0.out_of_256(84) as u64;
     }
-    assert_eq!(yes, 21429);
-    for _ in 0..(1 << 16) {
+    assert_eq!(yes, 328435);
+    for _ in 0..n {
         assert!(!rng0.out_of_128(0))
     }
     let mut yes = 0u64;
-    for _ in 0..(1 << 16) {
+    for _ in 0..n {
         yes += rng0.out_of_128(127) as u64;
     }
-    assert_eq!(yes, 65053);
-    for _ in 0..(1 << 16) {
+    assert_eq!(yes, 992168);
+    for _ in 0..n {
         assert!(rng0.out_of_128(128))
     }
-    for _ in 0..(1 << 16) {
+    for _ in 0..n {
         assert!(!rng0.out_of_256(0))
     }
     let mut yes = 0u64;
-    for _ in 0..(1 << 16) {
+    for _ in 0..n {
         yes += rng0.out_of_256(255) as u64;
     }
-    assert_eq!(yes, 65303);
+    assert_eq!(yes, 996064);
     let mut yes = 0u64;
-    for _ in 0..(1 << 16) {
+    for _ in 0..n {
         yes += rng0.out_of_4(3) as u64;
     }
-    assert_eq!(yes, 49176);
+    assert_eq!(yes, 749947);
 
     let mut rng0 = StarRng::new(0);
     assert!(rng0.index(0).is_none());
     assert!(rng0.index_slice(&[0u8; 0]).is_none());
     let mut slice = vec![0u64; 7];
-    for _ in 0..(1 << 16) {
+    for _ in 0..n {
         *rng0.index_slice_mut(&mut slice).unwrap() += 1;
     }
     for e in slice {
-        assert!((e > 9149) && (e < 9513));
+        assert!((142409..=143532).contains(&e));
     }
 }
 
