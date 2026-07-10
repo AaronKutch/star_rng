@@ -35,6 +35,7 @@ test_all *ARGS:
   {{cargo}} nextest run --no-default-features {{ARGS}}
   {{cargo}} nextest run --all-features {{ARGS}}
   {{cargo}} t --doc --all-features {{ARGS}}
+  {{cargo}} machete
 
 # Needs to be run with the MSRV toolchain
 test_for_msrv:
