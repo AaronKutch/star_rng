@@ -61,6 +61,24 @@ fn test_vectors() {
     }
 }
 
+#[test]
+fn test_vectors2() {
+    let mut rng = StarRng::new(0);
+    let mut dst = [0; 65];
+    rng.fill_bytes(&mut dst);
+
+    assert_eq!(rng.index_inclusive(0), 0);
+    assert_eq!(rng.index_inclusive(1 << 15), 27303);
+    assert_eq!(rng.index_inclusive(1), 1);
+    assert_eq!(rng.index_inclusive(1), 0);
+    assert_eq!(rng.index_inclusive(1), 0);
+    assert_eq!(rng.index_inclusive(1), 0);
+    assert_eq!(rng.index_inclusive(1), 1);
+
+    assert_eq!(rng.index_inclusive(2), 2);
+    assert_eq!(rng.index_inclusive(2), 0);
+}
+
 #[cfg(feature = "awint_support")]
 fn rand_choice(
     metarng: &mut rand_xoshiro::Xoshiro128StarStar,
@@ -295,8 +313,9 @@ fn loops() {
 // statistical regression guards for the internal bit buffer
 
 /// Every bit position of a `width`-bit draw must be set with probability 1/2.
-/// Widths 1..=32 exercise a single `consume`; widths > 32 exercise the multi-word
-/// path that mixes full `internal_next_u32` words with a trailing partial consume.
+/// Widths 1..=32 exercise a single `consume`; widths > 32 exercise the
+/// multi-word path that mixes full `internal_next_u32` words with a trailing
+/// partial consume.
 #[test]
 #[cfg(not(debug_assertions))]
 fn bit_density() {
@@ -324,8 +343,9 @@ fn bit_density() {
     }
 }
 
-/// Chi-square uniformity check on ranges that require multiple 32-bit words, which
-/// exercises the word/partial-consume boundary that bit-exact tests cannot see.
+/// Chi-square uniformity check on ranges that require multiple 32-bit words,
+/// which exercises the word/partial-consume boundary that bit-exact tests
+/// cannot see.
 #[test]
 #[cfg(not(debug_assertions))]
 fn chi_square_uniformity() {
@@ -364,4 +384,18 @@ fn chi_square_uniformity() {
     }
     let z = chi2_z(&hist);
     assert!(z.abs() < 8.0, "index is non-uniform: chi2_z = {z}");
+
+    // `index_inclusive` over 0..1_000_000
+    let range = 1_000_000usize;
+    let mut hist = vec![0u64; BUCKETS];
+    let mut rng = StarRng::new(1);
+    for _ in 0..N {
+        let v = rng.index_inclusive(range).unwrap();
+        hist[v / (range / BUCKETS)] += 1;
+    }
+    let z = chi2_z(&hist);
+    assert!(
+        z.abs() < 8.0,
+        "index_inclusive is non-uniform: chi2_z = {z}"
+    );
 }

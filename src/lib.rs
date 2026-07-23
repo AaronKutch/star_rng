@@ -379,6 +379,31 @@ impl StarRng {
         }
     }
 
+    /// Returns a random index, given an _inclusive_ maximum of `len_inclusive`
+    #[must_use]
+    pub fn index_inclusive(&mut self, len_inclusive: usize) -> usize {
+        if len_inclusive == 0 {
+            0
+        } else {
+            let w = if len_inclusive >= (1 << (usize::BITS - 1)) {
+                usize::BITS as usize
+            } else {
+                // powers of two minus one consume exactly now
+                len_inclusive
+                    .wrapping_add(1)
+                    .next_power_of_two()
+                    .trailing_zeros() as usize
+            };
+            for _ in 0..MAX_RETRIES {
+                let test_val = self.consume_usize(w);
+                if test_val <= len_inclusive {
+                    return test_val;
+                }
+            }
+            0
+        }
+    }
+
     /// Takes a random index of a slice. Returns `None` if `slice.is_empty()`.
     #[must_use]
     pub fn index_slice<'a, T>(&mut self, slice: &'a [T]) -> Option<&'a T> {

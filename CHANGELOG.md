@@ -9,6 +9,12 @@
 - `rand_core` 0.10
 - `rand_xoshiro` 0.8
 
+The same deterministic behavior has remained through reviews of idealness,
+the exact behavior of this version should remain stable for the forseeable future.
+
+### Changes
+- Added `index_inclusive`
+
 ## [0.2.0] - 2025-02-11
 ### Crate
 - `rand_core` 0.9
