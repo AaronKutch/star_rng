@@ -62,7 +62,7 @@ fn chi_square_uniformity() {
         hist[(v / (range / BUCKETS as u64)) as usize] += 1;
     }
     let z = chi2_z(&hist);
-    assert!(z.abs() < 8.0, "uniform_u64 is non-uniform: chi2_z = {z}");
+    assert!(z.abs() < 2.0, "uniform_u64 is non-uniform: chi2_z = {z}");
 
     // `index` over 0..1_000_000
     let range = 1_000_000usize;
@@ -73,7 +73,7 @@ fn chi_square_uniformity() {
         hist[v / (range / BUCKETS)] += 1;
     }
     let z = chi2_z(&hist);
-    assert!(z.abs() < 8.0, "index is non-uniform: chi2_z = {z}");
+    assert!(z.abs() < 2.0, "index is non-uniform: chi2_z = {z}");
 
     // `index_inclusive` over 0..1_000_000
     let range = 1_000_000usize;
@@ -85,7 +85,7 @@ fn chi_square_uniformity() {
     }
     let z = chi2_z(&hist);
     assert!(
-        z.abs() < 8.0,
+        z.abs() < 2.0,
         "index_inclusive is non-uniform: chi2_z = {z}"
     );
 }
@@ -184,8 +184,9 @@ fn shuffle_agrees_with_partial() {
         assert!(rest.is_empty());
         assert_eq!(va, vb, "len {len}");
         assert_eq!(va, vc, "len {len}");
-        assert_eq!(a.next_u64(), b.next_u64(), "len {len} state differs");
-        assert_eq!(a.next_u64(), c.next_u64(), "len {len} state differs");
+        let tmp = a.next_u64();
+        assert_eq!(tmp, b.next_u64(), "len {len} state differs");
+        assert_eq!(tmp, c.next_u64(), "len {len} state differs");
     }
 }
 
