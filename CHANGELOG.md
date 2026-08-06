@@ -15,6 +15,7 @@ the exact behavior of this version should remain stable for the forseeable futur
 ### Changes
 - Added `index_inclusive`
 - Added `shuffle` and `partial_shuffle`
+- Added `seed` and `bits_consumed` to indicate the exact deterministic place in RNG, and added them to the debug impl
 
 ## [0.2.0] - 2025-02-11
 ### Crate

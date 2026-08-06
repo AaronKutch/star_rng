@@ -42,6 +42,8 @@ fn test_vectors() {
         13939501709697904127631821811304380035
     );
 
+    assert_eq!(rng.bits_consumed(), 1094);
+
     #[cfg(feature = "awint_support")]
     {
         use awint::awi::*;

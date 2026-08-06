@@ -30,12 +30,20 @@ pub struct StarRng {
     buf1: u32,
     // Used bits in `buf1`, must be at most `BW`
     used: NonZeroU8,
+
+    // used for nice debug, I don't think there are serious situations where we are concerned about
+    // state size, if there are then we can configure this away
+    seed: u64,
+    bits_consumed: u64,
 }
 
 // this is to make it easier to put in things and throw Debug on them
 impl fmt::Debug for StarRng {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("StarRng").finish()
+        f.debug_struct("StarRng")
+            .field("seed", &self.seed)
+            .field("bits_consumed", &self.bits_consumed)
+            .finish()
     }
 }
 
@@ -245,7 +253,21 @@ impl StarRng {
             buf0,
             buf1,
             used: BW_U,
+            seed,
+            bits_consumed: 0,
         }
+    }
+
+    /// Returns the deterministic seed
+    pub fn seed(&self) -> u64 {
+        self.seed
+    }
+
+    /// Returns the number of deterministic bits consumed with this seed.
+    ///
+    /// Wraps and does not panic on overflow.
+    pub fn bits_consumed(&self) -> u64 {
+        self.bits_consumed
     }
 
     fn internal_next_u32(&mut self) -> u32 {
@@ -259,6 +281,7 @@ impl StarRng {
             self.buf0 |= new << self.used.get();
             self.buf1 = new >> (BW_U.get() - self.used.get());
         }
+        self.bits_consumed = self.bits_consumed.wrapping_add(32);
         res
     }
 
@@ -276,6 +299,7 @@ impl StarRng {
             self.buf1 = self.rng.next_u32();
             self.used = BW_U;
         }
+        self.bits_consumed = self.bits_consumed.wrapping_add(1);
         res
     }
 
@@ -311,6 +335,7 @@ impl StarRng {
             self.buf1 = new >> usize::from(lo);
             self.used = hi;
         }
+        self.bits_consumed = self.bits_consumed.wrapping_add(bits.into());
         res
     }
 
