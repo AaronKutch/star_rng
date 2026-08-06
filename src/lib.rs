@@ -418,6 +418,36 @@ impl StarRng {
         slice.get_mut(inx)
     }
 
+    /// Does an unbiased shuffle of elements in the slice
+    pub fn shuffle<T>(&mut self, slice: &mut [T]) {
+        let len = slice.len();
+        // use the same behavior
+        self.partial_shuffle(slice, len);
+    }
+
+    /// Simulates getting the first `num` elements of an unbiased shuffle of
+    /// `slice`. Returns a tuple of the `num` shuffled elements followed by a
+    /// remainder in arbitrary order. `num >= slice.len()` is a full shuffle,
+    /// and `num` is clamped to `slice.len()`.
+    ///
+    /// The point of this is that it requires only on the order of `num`
+    /// internal RNG calls on an arbitrarily long slice.
+    pub fn partial_shuffle<'a, T>(
+        &mut self,
+        slice: &'a mut [T],
+        num: usize,
+    ) -> (&'a mut [T], &'a mut [T]) {
+        let len = slice.len();
+        let num = num.min(len);
+        for i in 0..num {
+            // uniform over `i..len`; `i <= num - 1 <= len - 1` so this
+            // cannot underflow, and the range is never empty if we enter the loop
+            let j = i + self.index_inclusive(len - 1 - i);
+            slice.swap(i, j);
+        }
+        slice.split_at_mut(num)
+    }
+
     /// Assigns random value to `bits[..width]`, zeroing the rest of the bits.
     /// Returns `None` if `width > bits.bw()`.
     #[must_use]

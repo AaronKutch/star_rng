@@ -14,6 +14,7 @@ the exact behavior of this version should remain stable for the forseeable futur
 
 ### Changes
 - Added `index_inclusive`
+- Added `shuffle` and `partial_shuffle`
 
 ## [0.2.0] - 2025-02-11
 ### Crate
