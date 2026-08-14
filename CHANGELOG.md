@@ -2,7 +2,7 @@
 
 ## [0.3.0] - TODO
 ### Crate
-- Set the MSRV to 1.86
+- MSRV 1.88
 - removed mandatory dependency on `awint`, so that it can be used by more crates and is more
   optimized. The specially optimized `next_bits`, `next_bits_width`, and `linear_fuzz_step`
   functions can be accessed again with the "awint_support" feature FIXME
