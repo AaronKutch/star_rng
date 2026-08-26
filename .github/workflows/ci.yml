@@ -22,7 +22,7 @@ jobs:
           rustup target add riscv32i-unknown-none-elf
       - name: Run test suite
         run: |
-          cargo b --target=riscv32i-unknown-none-elf -p no_std_test
+          cargo b --target=riscv32i-unknown-none-elf
           cargo doc --all-features
           cargo build
           cargo build --all-features
