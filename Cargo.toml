@@ -1,6 +1,6 @@
 [package]
 name = "star_rng"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 # `flake.nix` and `ci.yml` read this automatically, but run `nix flake update`
 # and fix any hashes. The pinned toolchain in `pinned-toolchain.toml` is
@@ -20,11 +20,11 @@ default = []
 awint_support = ["awint"]
 
 [dependencies]
-awint = { path = "./../awint/awint", optional = true, default-features = false }
-#awint = { version = "0.18", optional = true, default-features = false }
+#awint = { path = "./../awint/awint", optional = true, default-features = false }
+awint = { version = "0.19", optional = true, default-features = false }
 rand_core = { version = "0.10" }
 rand_xoshiro = { version = "0.8", default-features = false }
 
 [dev-dependencies]
-awint = { path = "./../awint/awint", default-features = false, features = ["alloc", "rand_support"] }
-#awint = { version = "0.18", default-features = false, features = ["alloc", "rand_support"] }
+#awint = { path = "./../awint/awint", default-features = false, features = ["alloc", "rand_support"] }
+awint = { version = "0.19", default-features = false, features = ["alloc", "rand_support"] }
