@@ -17,14 +17,9 @@ categories = ["algorithms", "no-std"]
 
 [features]
 default = []
-awint_support = ["awint"]
 
 [dependencies]
-#awint = { path = "./../awint/awint", optional = true, default-features = false }
-awint = { version = "0.19", optional = true, default-features = false }
 rand_core = { version = "0.10" }
 rand_xoshiro = { version = "0.8", default-features = false }
 
 [dev-dependencies]
-#awint = { path = "./../awint/awint", default-features = false, features = ["alloc", "rand_support"] }
-awint = { version = "0.19", default-features = false, features = ["alloc", "rand_support"] }

@@ -75,7 +75,8 @@ impl TryRng for StarRng {
                 if rem == 0 {
                     break;
                 }
-                dst[i..].copy_from_slice(&self.consume((rem * 8) as u8).to_le_bytes()[..rem]);
+                dst[i..]
+                    .copy_from_slice(&self.internal_consume((rem * 8) as u8).to_le_bytes()[..rem]);
                 break;
             }
             // safe by isize::MAX limit
@@ -105,14 +106,14 @@ macro_rules! next_width {
                     return None
                 }
                 Some(if $x::BITS <= u32::BITS {
-                    self.consume(width as u8) as $x
+                    self.internal_consume(width as u8) as $x
                 } else {
                     let mut res: $x = 0;
                     let mut shl = 0;
                     loop {
                         if width < BW {
                             if width != 0 {
-                                res |= (self.consume(width as u8) as $x) << shl;
+                                res |= (self.internal_consume(width as u8) as $x) << shl;
                             }
                             break
                         }
@@ -133,7 +134,7 @@ macro_rules! next {
             /// Returns an output with all bits being randomized
             pub fn $name(&mut self) -> $x {
                 if $x::BITS <= u32::BITS {
-                    self.consume($x::BITS as u8) as $x
+                    self.internal_consume($x::BITS as u8) as $x
                 } else {
                     let mut res: $x = 0;
                     let mut shl = 0usize;
@@ -163,7 +164,7 @@ macro_rules! out_of {
                 } else if num >= $max {
                     true
                 } else {
-                    num > (self.consume($bw) as u8)
+                    num > (self.internal_consume($bw) as u8)
                 }
             }
         )*
@@ -270,7 +271,8 @@ impl StarRng {
         self.bits_consumed
     }
 
-    fn internal_next_u32(&mut self) -> u32 {
+    #[doc(hidden)]
+    pub fn internal_next_u32(&mut self) -> u32 {
         // special casing, no updates to `used` since it is modulo 32
         let res = self.buf0;
         self.buf0 = self.buf1;
@@ -306,7 +308,8 @@ impl StarRng {
     /// Returns `bits` (must be less than or equal to `BW`) used bits in the
     /// `u32` and maintains invariants
     #[inline] // some preconditions are often unneccesary but they will get optimized away
-    fn consume(&mut self, bits: u8) -> u32 {
+    #[doc(hidden)]
+    pub fn internal_consume(&mut self, bits: u8) -> u32 {
         assert!(bits <= BW_U.get());
         if bits == 0 {
             return 0;
@@ -340,17 +343,18 @@ impl StarRng {
     }
 
     #[inline]
-    fn consume_usize(&mut self, mut bits: usize) -> usize {
+    #[doc(hidden)]
+    pub fn internal_consume_usize(&mut self, mut bits: usize) -> usize {
         assert!(bits <= (usize::BITS as usize));
         if usize::BITS <= u32::BITS {
-            self.consume(bits as u8) as usize
+            self.internal_consume(bits as u8) as usize
         } else {
             let mut res = 0usize;
             let mut shl = 0;
             loop {
                 if bits < BW {
                     if bits != 0 {
-                        res |= (self.consume(bits as u8) as usize) << shl;
+                        res |= (self.internal_consume(bits as u8) as usize) << shl;
                     }
                     break res;
                 }
@@ -390,7 +394,7 @@ impl StarRng {
                 len.next_power_of_two().trailing_zeros() as usize
             };
             for _ in 0..MAX_RETRIES {
-                let test_val = self.consume_usize(w);
+                let test_val = self.internal_consume_usize(w);
                 if test_val < len {
                     return Some(test_val);
                 }
@@ -420,7 +424,7 @@ impl StarRng {
                     .trailing_zeros() as usize
             };
             for _ in 0..MAX_RETRIES {
-                let test_val = self.consume_usize(w);
+                let test_val = self.internal_consume_usize(w);
                 if test_val <= len_inclusive {
                     return test_val;
                 }
@@ -471,84 +475,5 @@ impl StarRng {
             slice.swap(i, j);
         }
         slice.split_at_mut(num)
-    }
-
-    /// Assigns random value to `bits[..width]`, zeroing the rest of the bits.
-    /// Returns `None` if `width > bits.bw()`.
-    #[must_use]
-    #[cfg(feature = "awint_support")]
-    pub fn next_bits_width(&mut self, bits: &mut awint::Bits, mut width: usize) -> Option<()> {
-        if width > bits.bw() {
-            return None;
-        }
-        bits.zero_();
-        if width == 0 {
-            return Some(());
-        }
-        let mut tmp = awint::InlAwi::from_u32(0);
-        let mut shl = 0;
-        loop {
-            if width < BW {
-                tmp.u32_(self.consume(width as u8));
-                bits.field_to(shl, &tmp, width).unwrap();
-                break;
-            }
-            tmp.u32_(self.internal_next_u32());
-            bits.field_to(shl, &tmp, 32).unwrap();
-            width -= 32;
-            shl += 32;
-        }
-        Some(())
-    }
-
-    /// Assigns random value to `bits`
-    #[cfg(feature = "awint_support")]
-    pub fn next_bits(&mut self, bits: &mut awint::Bits) {
-        self.next_bits_width(bits, bits.bw()).unwrap();
-    }
-
-    /// This performs one step of a fuzzer where a random field of ones is
-    /// ORed, ANDed, or XORed to `x`.
-    ///
-    /// In many cases there are issues that involve long lines of all set or
-    /// unset bits, and the `next_bits` function is unsuitable for this as
-    /// `x.bw()` gets larger than a few bits. This function produces random
-    /// length strings of ones and zeros concatenated together, which can
-    /// rapidly probe a more structured space even for large `x`.
-    ///
-    /// ```
-    /// use awint::awi::*;
-    /// use star_rng::StarRng;
-    ///
-    /// let mut rng = StarRng::new(7);
-    /// let mut x = awi!(0u128);
-    /// // this should be done in a loop with thousands of iterations,
-    /// // here I have unrolled a few for example
-    /// rng.linear_fuzz_step(&mut x);
-    /// assert_eq!(x, awi!(0x1_ffffffff_f0000000_u128));
-    /// rng.linear_fuzz_step(&mut x);
-    /// assert_eq!(x, awi!(0x3ffff01_ffffffff_f0000000_u128));
-    /// rng.linear_fuzz_step(&mut x);
-    /// assert_eq!(x, awi!(0x3fffcfe_00000001_f0000000_u128));
-    /// rng.linear_fuzz_step(&mut x);
-    /// assert_eq!(x, awi!(0xc000301_fffffffe_0fffff00_u128));
-    /// rng.linear_fuzz_step(&mut x);
-    /// assert_eq!(x, awi!(0xc_0c000301_fffffffe_0fffff00_u128));
-    /// ```
-    #[cfg(feature = "awint_support")]
-    pub fn linear_fuzz_step(&mut self, x: &mut awint::Bits) {
-        let tmp0 = self.index(x.bw()).unwrap();
-        let tmp1 = self.index(x.bw().wrapping_add(1)).unwrap();
-        let r0 = core::cmp::min(tmp0, tmp1);
-        let r1 = core::cmp::max(tmp0, tmp1);
-        // note: it needs to be 2 parts XOR to 1 part OR and 1 part AND, the ordering
-        // guarantees this
-        if self.next_bool() {
-            x.range_xor_(r0..r1).unwrap();
-        } else if self.next_bool() {
-            x.range_or_(r0..r1).unwrap();
-        } else {
-            x.range_and_(r0..r1).unwrap();
-        }
     }
 }
