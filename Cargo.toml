@@ -1,7 +1,11 @@
 [package]
 name = "star_rng"
-version = "0.2.0"
-edition = "2021"
+version = "0.3.0"
+edition = "2024"
+# `flake.nix` and `ci.yml` read this automatically, but run `nix flake update`
+# and fix any hashes. The pinned toolchain in `pinned-toolchain.toml` is
+# bumped separately.
+rust-version = "1.88"
 authors = ["Aaron Kutch <aaronkutch@att.net>"]
 license = "MIT OR Apache-2.0"
 readme = "README.md"
@@ -11,12 +15,11 @@ description = "opinionated PRNG for easier fuzz testing"
 keywords = ["rng", "prng", "random"]
 categories = ["algorithms", "no-std"]
 
+[features]
+default = []
+
 [dependencies]
-#awint = { path = "./../awint/awint", default-features = false }
-awint = { version = "0.18", default-features = false }
-rand_xoshiro = { version = "0.7", default-features = false }
-rand_core = { version = "0.9" }
+rand_core = { version = "0.10" }
+rand_xoshiro = { version = "0.8", default-features = false }
 
 [dev-dependencies]
-#awint = { path = "./../awint/awint", default-features = false, features = ["alloc"]}
-awint = { version = "0.18", default-features = false, features = ["alloc"] }

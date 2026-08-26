@@ -4,30 +4,53 @@ on: [pull_request]
 
 env:
   RUST_BACKTRACE: 1
+  RUSTFLAGS: -D warnings
+  RUSTDOCFLAGS: -D warnings
 
 jobs:
-  msrv_test_suite:
+  # still do this to detect warnings on latest
+  test_suite:
+    name: Test suite
     runs-on: ubuntu-latest
-    env:
-      RUSTFLAGS: -D warnings
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v7
+      # use latest nightly
       - name: Install Rust components
         run: |
           rustup set profile minimal
-          rustup install 1.70
+          rustup default nightly
+          rustup target add riscv32i-unknown-none-elf
       - name: Run test suite
         run: |
+          cargo b --target=riscv32i-unknown-none-elf
           cargo doc --all-features
+          cargo build
           cargo build --all-features
+          cargo test
           cargo test --all-features
+          cargo test --release
           cargo test --release --all-features
+
+  msrv_build:
+    name: MSRV build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # reads the `rust-version` of Cargo.toml
+      - name: Install MSRV
+        run: |
+          rustup set profile minimal
+          rustup default "$(sed -n 's/^rust-version = "\(.*\)"/\1/p' Cargo.toml)"
+      - name: Check that the crate builds on its MSRV
+        run: |
+          cargo build
+          cargo build --all-features
 
   rustfmt:
     name: Rustfmt
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v7
       # Acquire the most recent nightly with a rustfmt component
       - name: Install most recent Rustfmt
         run: |
@@ -42,7 +65,7 @@ jobs:
     name: Clippy
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v7
       # Acquire the most recent nightly with a clippy component
       - name: Install most recent Clippy
         run: |
